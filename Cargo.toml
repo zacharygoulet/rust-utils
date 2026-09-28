@@ -1,0 +1,15 @@
+[package]
+name = "rust-utils"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "rust_utils"
+path = "src/lib.rs"
+
+[dependencies]
+rust-utils-macros = { path = "macros" }
+
+[workspace]
+members = ["macros"]
+resolver = "3"
