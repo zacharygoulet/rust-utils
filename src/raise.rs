@@ -22,6 +22,10 @@ impl Display for Raised {
 
 impl std::error::Error for Raised {}
 
+pub fn raise(message: impl Display) -> ! {
+    panic::panic_any(Raised::new(message.to_string()));
+}
+
 pub trait RaiseExt<T, E> {
     fn raise(self) -> T;
 }
@@ -30,7 +34,7 @@ impl<T, E: Display> RaiseExt<T, E> for Result<T, E> {
     fn raise(self) -> T {
         match self {
             Ok(value) => value,
-            Err(error) => panic::panic_any(Raised::new(error.to_string())),
+            Err(error) => raise(error),
         }
     }
 }
@@ -68,11 +72,18 @@ macro_rules! catch_raised {
 
 #[cfg(test)]
 mod tests {
-    use super::{RaiseExt, Raised, catch_raised};
+    use super::{RaiseExt, Raised, catch_raised, raise};
 
     #[test]
     fn raise_returns_successful_values() {
         assert_eq!(Ok::<_, &str>(42).raise(), 42);
+    }
+
+    #[test]
+    fn raise_creates_a_catchable_user_error() {
+        let result = catch_raised(|| raise("expected error"));
+
+        assert_eq!(result, Err(Raised::new("expected error")));
     }
 
     #[test]
