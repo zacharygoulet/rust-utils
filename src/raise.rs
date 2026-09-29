@@ -39,6 +39,23 @@ impl<T, E: Display> RaiseExt<T, E> for Result<T, E> {
     }
 }
 
+pub trait RaiseContext<T> {
+    fn raise_with_context(self, message: impl FnOnce() -> String) -> T;
+}
+
+impl<T, E: Display> RaiseContext<T> for Result<T, E> {
+    fn raise_with_context(self, message: impl FnOnce() -> String) -> T {
+        self.map_err(|error| format!("{}: {error}", message()))
+            .raise()
+    }
+}
+
+impl<T> RaiseContext<T> for Option<T> {
+    fn raise_with_context(self, message: impl FnOnce() -> String) -> T {
+        self.ok_or_else(message).raise()
+    }
+}
+
 pub fn catch_raised<T, F>(operation: F) -> Result<T, Raised>
 where
     F: FnOnce() -> T + UnwindSafe,
@@ -72,11 +89,29 @@ macro_rules! catch_raised {
 
 #[cfg(test)]
 mod tests {
-    use super::{RaiseExt, Raised, catch_raised, raise};
+    use super::{RaiseContext, RaiseExt, Raised, catch_raised, raise};
 
     #[test]
     fn raise_returns_successful_values() {
         assert_eq!(Ok::<_, &str>(42).raise(), 42);
+    }
+
+    #[test]
+    fn result_raise_context_adds_the_context() {
+        let result = catch_raised(|| {
+            Err::<(), _>("failure").raise_with_context(|| "reading file".into());
+        });
+
+        assert_eq!(result, Err(Raised::new("reading file: failure")));
+    }
+
+    #[test]
+    fn option_raise_context_raises_when_missing() {
+        let result = catch_raised(|| {
+            None::<()>.raise_with_context(|| "missing value".into());
+        });
+
+        assert_eq!(result, Err(Raised::new("missing value")));
     }
 
     #[test]
